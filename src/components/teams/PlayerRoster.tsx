@@ -31,7 +31,7 @@ const PlayerRoster: React.FC<PlayerRosterProps> = ({
   };
 
   const handleDeletePlayer = async (playerId: number) => {
-    if (!confirm('Are you sure you want to remove this player from the team?')) {
+    if (!window.confirm('Are you sure you want to remove this player from the team?')) {
       return;
     }
 

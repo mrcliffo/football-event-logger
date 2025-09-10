@@ -4,6 +4,7 @@ import { Team, Player, Season } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import PlayerRoster from './PlayerRoster';
 import TeamForm from './TeamForm';
+import EventTypeManager from '../admin/EventTypeManager';
 
 const TeamManagement: React.FC = () => {
   const { user } = useAuth();
@@ -14,6 +15,7 @@ const TeamManagement: React.FC = () => {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [showEventTypeManager, setShowEventTypeManager] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -96,7 +98,7 @@ const TeamManagement: React.FC = () => {
   };
 
   const handleDeleteTeam = async (teamId: number) => {
-    if (!confirm('Are you sure you want to delete this team? This will also delete all associated players and matches.')) {
+    if (!window.confirm('Are you sure you want to delete this team? This will also delete all associated players and matches.')) {
       return;
     }
 
@@ -213,12 +215,25 @@ const TeamManagement: React.FC = () => {
 
         <div className="team-content">
           {selectedTeam ? (
-            <PlayerRoster 
-              team={selectedTeam}
-              players={players}
-              onPlayerUpdate={handlePlayerUpdate}
-              canEdit={user?.role === 'coach'}
-            />
+            <>
+              {user?.role === 'coach' && (
+                <div className="team-admin-actions">
+                  <button 
+                    className="manage-events-btn"
+                    onClick={() => setShowEventTypeManager(true)}
+                  >
+                    🎯 Manage Event Types
+                  </button>
+                </div>
+              )}
+              
+              <PlayerRoster 
+                team={selectedTeam}
+                players={players}
+                onPlayerUpdate={handlePlayerUpdate}
+                canEdit={user?.role === 'coach'}
+              />
+            </>
           ) : (
             <div className="no-team-selected">
               <h3>Select a Team</h3>
@@ -227,6 +242,15 @@ const TeamManagement: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showEventTypeManager && selectedTeam?.id && (
+        <div className="modal-overlay">
+          <EventTypeManager 
+            teamId={selectedTeam.id}
+            onClose={() => setShowEventTypeManager(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

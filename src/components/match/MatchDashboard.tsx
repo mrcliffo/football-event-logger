@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { matchService, teamService } from '../../database/services';
 import { Match, Team } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import EventLogger from './EventLogger';
+import MobileEventLogger from './MobileEventLogger';
 
 const MatchDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -234,17 +234,17 @@ const MatchDashboard: React.FC = () => {
               </div>
 
               {!selectedMatch.isCompleted ? (
-                <EventLogger 
+                <MobileEventLogger 
                   match={selectedMatch} 
-                  onEventAdded={() => loadDashboardData()}
+                  onMatchUpdate={() => loadDashboardData()}
                 />
               ) : (
                 <div className="completed-match">
                   <h4>Match Completed</h4>
                   <p>This match has been completed. View event history below.</p>
-                  <EventLogger 
+                  <MobileEventLogger 
                     match={selectedMatch} 
-                    onEventAdded={() => loadDashboardData()}
+                    onMatchUpdate={() => loadDashboardData()}
                   />
                 </div>
               )}

@@ -94,7 +94,7 @@ const MatchList: React.FC<MatchListProps> = ({
               <div className="match-details">
                 <span className="date">{formatMatchDate(match.date)}</span>
                 <span className="venue">{match.venue}</span>
-                <span className="duration">{match.duration}min</span>
+                <span className="periods">{match.periods} periods</span>
               </div>
             </div>
 

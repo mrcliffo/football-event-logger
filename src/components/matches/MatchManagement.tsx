@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { matchService, teamService } from '../../database/services';
 import { Match, Team } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import MatchForm from './MatchForm';
+import SimpleMatchForm from './SimpleMatchForm';
 import MatchList from './MatchList';
 
 const MatchManagement: React.FC = () => {
@@ -102,7 +102,7 @@ const MatchManagement: React.FC = () => {
   };
 
   const handleDeleteMatch = async (matchId: number) => {
-    if (!confirm('Are you sure you want to delete this match? This will also delete all associated match events.')) {
+    if (!window.confirm('Are you sure you want to delete this match? This will also delete all associated match events.')) {
       return;
     }
 
@@ -171,7 +171,7 @@ const MatchManagement: React.FC = () => {
       </div>
 
       {showMatchForm && selectedTeam && (
-        <MatchForm
+        <SimpleMatchForm
           match={editingMatch}
           team={selectedTeam}
           onSave={handleMatchSave}

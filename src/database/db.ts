@@ -5,6 +5,8 @@ import {
   Player,
   Match,
   MatchEvent,
+  MatchPeriod,
+  EventType,
   Season,
   PlayerStats,
   Award
@@ -16,6 +18,8 @@ export class FootballEventDatabase extends Dexie {
   players!: Table<Player>;
   matches!: Table<Match>;
   matchEvents!: Table<MatchEvent>;
+  matchPeriods!: Table<MatchPeriod>;
+  eventTypes!: Table<EventType>;
   seasons!: Table<Season>;
   playerStats!: Table<PlayerStats>;
   awards!: Table<Award>;
@@ -23,12 +27,14 @@ export class FootballEventDatabase extends Dexie {
   constructor() {
     super('FootballEventDatabase');
     
-    this.version(1).stores({
+    this.version(3).stores({
       users: '++id, email, role, *teamIds',
       teams: '++id, name, ageGroup, season, coachId, isActive',
       players: '++id, firstName, lastName, teamId, *parentIds, playerUserId, isActive',
-      matches: '++id, teamId, date, opponent, isCompleted',
-      matchEvents: '++id, matchId, playerId, eventType, minute, syncStatus',
+      matches: '++id, teamId, date, opponent, isCompleted, isStarted, currentPeriod, periods',
+      matchEvents: '++id, matchId, playerId, eventTypeId, periodNumber, timestamp, syncStatus',
+      matchPeriods: '++id, matchId, periodNumber, isActive, isCompleted',
+      eventTypes: '++id, teamId, name, isActive, sortOrder',
       seasons: '++id, name, startDate, endDate, isActive',
       playerStats: '++id, playerId, seasonId, teamId',
       awards: '++id, seasonId, teamId, playerId, awardType'
@@ -91,6 +97,15 @@ export class FootballEventDatabase extends Dexie {
 
     this.awards.hook('creating', (primKey, obj, trans) => {
       obj.createdAt = new Date();
+    });
+
+    this.eventTypes.hook('creating', (primKey, obj, trans) => {
+      obj.createdAt = new Date();
+      obj.updatedAt = new Date();
+    });
+
+    this.eventTypes.hook('updating', (modifications) => {
+      (modifications as any).updatedAt = new Date();
     });
   }
 }

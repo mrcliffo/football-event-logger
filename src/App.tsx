@@ -8,6 +8,7 @@ import SeasonAwards from './components/awards/SeasonAwards';
 import TeamManagement from './components/teams/TeamManagement';
 import MatchManagement from './components/matches/MatchManagement';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import LoginForm from './components/auth/LoginForm';
 import './App.css';
 
 const AppContent: React.FC = () => {
@@ -56,7 +57,7 @@ const AppContent: React.FC = () => {
   };
 
   if (!isAuthenticated) {
-    return <div className="app-container" />;
+    return <LoginForm />;
   }
 
   return (

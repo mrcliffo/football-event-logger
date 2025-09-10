@@ -46,9 +46,12 @@ export interface Match {
   result?: 'win' | 'loss' | 'draw';
   teamScore?: number;
   opponentScore?: number;
-  duration: number; // minutes
+  periods: number; // Number of periods (e.g., 2 halves, 3 periods, etc.)
   notes?: string;
   isCompleted: boolean;
+  isStarted: boolean;
+  currentPeriod: number;
+  totalElapsedTime: number; // Total elapsed time in seconds
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,11 +60,37 @@ export interface MatchEvent {
   id?: number;
   matchId: number;
   playerId?: number; // null for team events
-  eventType: 'goal' | 'assist' | 'yellow_card' | 'red_card' | 'substitution_on' | 'substitution_off' | 'own_goal';
-  minute: number;
+  eventTypeId: number; // References EventType.id
+  periodNumber: number;
+  timestamp: number; // Time in seconds from match start
   notes?: string;
   createdAt: Date;
   syncStatus: 'pending' | 'synced' | 'failed';
+}
+
+export interface MatchPeriod {
+  id?: number;
+  matchId: number;
+  periodNumber: number;
+  startTime?: Date;
+  endTime?: Date;
+  elapsedTime: number; // Time in seconds
+  isActive: boolean;
+  isCompleted: boolean;
+}
+
+export interface EventType {
+  id?: number;
+  teamId: number;
+  name: string;
+  icon: string; // Emoji or symbol
+  color: string; // Hex color code
+  requiresPlayer: boolean;
+  isPositive: boolean; // true for positive events (goals), false for negative (cards)
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Season {
@@ -106,8 +135,8 @@ export interface AuthState {
 
 export interface MatchEventForm {
   playerId?: number;
-  eventType: MatchEvent['eventType'];
-  minute: number;
+  eventTypeId: number;
+  timestamp: number; // Time in seconds from match start
   notes?: string;
 }
 

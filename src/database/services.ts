@@ -5,6 +5,8 @@ import {
   Player,
   Match,
   MatchEvent,
+  MatchPeriod,
+  EventType,
   Season,
   PlayerStats,
   Award,
@@ -42,7 +44,10 @@ export const userService = {
 // Team Services
 export const teamService = {
   async create(team: Omit<Team, 'id'>): Promise<number> {
-    return await db.teams.add(team);
+    const teamId = await db.teams.add(team);
+    // Automatically create default event types for the new team
+    await eventTypeService.createDefaultEventTypes(teamId);
+    return teamId;
   },
 
   async getById(id: number): Promise<Team | undefined> {
@@ -182,7 +187,7 @@ export const matchEventService = {
   async getByMatch(matchId: number): Promise<MatchEvent[]> {
     return await db.matchEvents
       .where('matchId').equals(matchId)
-      .sortBy('minute');
+      .sortBy('timestamp');
   },
 
   async getPendingSync(): Promise<MatchEvent[]> {
@@ -349,22 +354,23 @@ async function updatePlayerStatsForEvent(event: MatchEvent, action: 'add' | 'rem
   const season = await seasonService.getCurrent();
   if (!season || !season.id) return;
 
+  // Get the event type to determine the stat to update
+  const eventType = await eventTypeService.getById(event.eventTypeId);
+  if (!eventType) return;
+
   const multiplier = action === 'add' ? 1 : -1;
   const updates: Partial<PlayerStats> = {};
 
-  switch (event.eventType) {
-    case 'goal':
-      updates.goals = multiplier;
-      break;
-    case 'assist':
-      updates.assists = multiplier;
-      break;
-    case 'yellow_card':
-      updates.yellowCards = multiplier;
-      break;
-    case 'red_card':
-      updates.redCards = multiplier;
-      break;
+  // Map event type names to stats - this assumes standard naming
+  const eventTypeName = eventType.name.toLowerCase();
+  if (eventTypeName.includes('goal')) {
+    updates.goals = multiplier;
+  } else if (eventTypeName.includes('assist')) {
+    updates.assists = multiplier;
+  } else if (eventTypeName.includes('yellow')) {
+    updates.yellowCards = multiplier;
+  } else if (eventTypeName.includes('red')) {
+    updates.redCards = multiplier;
   }
 
   if (Object.keys(updates).length > 0) {
@@ -381,3 +387,195 @@ async function updatePlayerStatsForEvent(event: MatchEvent, action: 'add' | 'rem
     await playerStatsService.update(event.playerId, season.id, player.teamId, newStats);
   }
 }
+
+// Match Period Services
+export const matchPeriodService = {
+  async create(period: Omit<MatchPeriod, 'id'>): Promise<number> {
+    return await db.matchPeriods.add(period);
+  },
+
+  async getByMatch(matchId: number): Promise<MatchPeriod[]> {
+    return await db.matchPeriods
+      .where('matchId').equals(matchId)
+      .sortBy('periodNumber');
+  },
+
+  async getCurrentPeriod(matchId: number): Promise<MatchPeriod | undefined> {
+    // Return the most recent period (active or completed) to track progression
+    return await db.matchPeriods
+      .where('matchId').equals(matchId)
+      .reverse()
+      .sortBy('periodNumber')
+      .then(periods => periods[0]);
+  },
+
+  async update(id: number, changes: Partial<MatchPeriod>): Promise<number> {
+    return await db.matchPeriods.update(id, changes);
+  },
+
+  async startPeriod(matchId: number, periodNumber: number): Promise<void> {
+    // End any currently active periods
+    const activePeriods = await db.matchPeriods
+      .where('matchId').equals(matchId)
+      .and(p => p.isActive).toArray();
+    
+    for (const period of activePeriods) {
+      if (period.id) {
+        await this.update(period.id, { 
+          isActive: false, 
+          endTime: new Date() 
+        });
+      }
+    }
+
+    // Start the new period
+    await this.create({
+      matchId,
+      periodNumber,
+      startTime: new Date(),
+      elapsedTime: 0,
+      isActive: true,
+      isCompleted: false
+    });
+  },
+
+  async endPeriod(matchId: number, periodNumber: number): Promise<void> {
+    const period = await db.matchPeriods
+      .where('matchId').equals(matchId)
+      .and(p => p.periodNumber === periodNumber && p.isActive)
+      .first();
+
+    if (period && period.id && period.startTime) {
+      const now = new Date();
+      const elapsedTime = Math.floor((now.getTime() - period.startTime.getTime()) / 1000);
+      
+      await this.update(period.id, {
+        isActive: false,
+        isCompleted: true,
+        endTime: now,
+        elapsedTime
+      });
+    }
+  }
+};
+
+// Event Type Services
+export const eventTypeService = {
+  async create(eventType: Omit<EventType, 'id'>): Promise<number> {
+    return await db.eventTypes.add(eventType);
+  },
+
+  async getByTeam(teamId: number): Promise<EventType[]> {
+    return await db.eventTypes
+      .where('teamId').equals(teamId)
+      .sortBy('sortOrder');
+  },
+
+  async getById(id: number): Promise<EventType | undefined> {
+    return await db.eventTypes.get(id);
+  },
+
+  async update(id: number, changes: Partial<EventType>): Promise<number> {
+    return await db.eventTypes.update(id, changes);
+  },
+
+  async delete(id: number): Promise<void> {
+    await db.eventTypes.delete(id);
+  },
+
+  async createDefaultEventTypesForExistingTeams(): Promise<void> {
+    // Get all teams
+    const teams = await db.teams.toArray();
+    
+    for (const team of teams) {
+      if (team.id) {
+        // Check if team already has event types
+        const existingTypes = await this.getByTeam(team.id);
+        if (existingTypes.length === 0) {
+          await this.createDefaultEventTypes(team.id);
+        }
+      }
+    }
+  },
+
+  async createDefaultEventTypes(teamId: number): Promise<void> {
+    const defaultEventTypes: Omit<EventType, 'id'>[] = [
+      {
+        teamId,
+        name: 'Goal',
+        icon: '⚽',
+        color: '#4caf50',
+        requiresPlayer: true,
+        isPositive: true,
+        isActive: true,
+        sortOrder: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        teamId,
+        name: 'Assist',
+        icon: '🎯',
+        color: '#2196f3',
+        requiresPlayer: true,
+        isPositive: true,
+        isActive: true,
+        sortOrder: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        teamId,
+        name: 'Tackle',
+        icon: '🛡️',
+        color: '#ff9800',
+        requiresPlayer: true,
+        isPositive: true,
+        isActive: true,
+        sortOrder: 3,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        teamId,
+        name: 'Save',
+        icon: '🥅',
+        color: '#9c27b0',
+        requiresPlayer: true,
+        isPositive: true,
+        isActive: true,
+        sortOrder: 4,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        teamId,
+        name: 'Yellow Card',
+        icon: '🟨',
+        color: '#ffeb3b',
+        requiresPlayer: true,
+        isPositive: false,
+        isActive: false, // Disabled by default for simplicity
+        sortOrder: 5,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        teamId,
+        name: 'Red Card',
+        icon: '🟥',
+        color: '#f44336',
+        requiresPlayer: true,
+        isPositive: false,
+        isActive: false, // Disabled by default for simplicity
+        sortOrder: 6,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    for (const eventType of defaultEventTypes) {
+      await this.create(eventType);
+    }
+  }
+};
